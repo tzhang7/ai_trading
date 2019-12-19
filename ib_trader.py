@@ -45,10 +45,7 @@ if __name__ == "__main__":
         tws_conn.connect()
         # Assign error handling function.
         tws_conn.register(error_handler, 'Error')
-        tws_conn.register(acct_update,
-                     message.updateAccountValue,
-                     message.updateAccountTime,
-                     message.updatePortfolio)
+
         # Assign server messages handling function.
         tws_conn.registerAll(server_handler)
         # Create AAPL contract and send order
