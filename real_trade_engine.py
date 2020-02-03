@@ -52,10 +52,10 @@ class IBTradeEngine(object):
     def __init__(self,
                  user,
                  vix_spot_ticker='VIY00',
-                 month1_ticker='VIZ19',
-                 month2_ticker='VIF20',
+                 month1_ticker='VIG20',
+                 month2_ticker='VIH20',
                  trade_ticker='TVIX',
-                 intraday_window=1,
+                 intraday_window=300,
                  buffer_size=2):
         """
 
@@ -71,8 +71,6 @@ class IBTradeEngine(object):
         self.month2_ticker = month2_ticker
         self.yahoo_data_loader = YahooDataLoader()
         self.trade_date = datetime.datetime.today()
-        # self.market_open_hour = datetime.time(9, 30, 0)
-        # self.market_close_hour = datetime.time(16, 0, 0)
         self.market_open_hour = datetime.time(9, 30, 0)
         self.market_close_hour = datetime.time(23, 0, 0)
 
@@ -84,17 +82,18 @@ class IBTradeEngine(object):
         self.hold_index = 0
         self.setup_coef = 0.3
         self.order_id = 123
+        self.schedule = [10,11,12,13,14,15,16]
         # Establish connection to TWS.
-        self.tws_conn = Connection.create(port=7497, clientId=999)
-        self.tws_conn.connect()
-
-        # Assign error handling function.
-        self.tws_conn.register(error_handler, 'Error')
-
-        # Assign server messages handling function.
-        self.tws_conn.registerAll(server_handler)
-        # Create TVIX contract and send order
-        self.tvix_contract = create_contract(trade_ticker, 'STK', 'SMART', 'SMART', 'USD')
+        # self.tws_conn = Connection.create(port=7497, clientId=999)
+        # self.tws_conn.connect()
+        #
+        # # Assign error handling function.
+        # self.tws_conn.register(error_handler, 'Error')
+        #
+        # # Assign server messages handling function.
+        # self.tws_conn.registerAll(server_handler)
+        # # Create TVIX contract and send order
+        # self.tvix_contract = create_contract(trade_ticker, 'STK', 'SMART', 'SMART', 'USD')
 
     def get_market_data(self):
         """
@@ -109,6 +108,40 @@ class IBTradeEngine(object):
         self.trade_market_px = market_data_crawer.get_barchart_real_time_data(self.trade_ticker)
         end = datetime.datetime.now()
         logger.info("Market data loaded, takes {0} seconds".format(end - start))
+
+    def mock_market_data(self, i):
+        """
+        Get all required ticker's market data
+        :return:
+        """
+        if i ==0:
+            self.vix_spot_px = 15
+            self.vix_month1_px = 18
+            self.vix_month2_px = 18
+            self.trade_market_px = 50
+        elif i ==1:
+            self.vix_spot_px = 15
+            self.vix_month1_px = 19
+            self.vix_month2_px = 19
+            self.trade_market_px = 49
+        elif i ==2:
+            self.vix_spot_px = 15
+            self.vix_month1_px = 19
+            self.vix_month2_px = 19
+            self.trade_market_px = 52
+
+        elif i ==3:
+            self.vix_spot_px = 15
+            self.vix_month1_px = 19
+            self.vix_month2_px = 19
+            self.trade_market_px = 53
+
+        elif i ==4:
+            self.vix_spot_px = 15
+            self.vix_month1_px = 19
+            self.vix_month2_px = 19
+            self.trade_market_px = 45
+
 
     def calc_signal(self):
         """
@@ -162,6 +195,12 @@ class IBTradeEngine(object):
         self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
         self.order_id += 1
 
+    def get_backtesting_data(self):
+        trade_dates = ['2019-12-10','2019-12-11']
+        dfs = []
+        for d in trade_dates:
+            df = pd.read_csv()
+
     def start_trading(self):
         """
         start trading: 1. Monitor signal 2. send notification to registered users
@@ -175,13 +214,12 @@ class IBTradeEngine(object):
             if self.market_open_hour <= trade_time.time() <= self.market_close_hour:
                 # Only monitor the signal during market hours
                 logger.info("*************** Market Open ***************")
+                #self.mock_market_data(t)
                 self.get_market_data()
                 wa_ratio = self.calc_signal()
                 # Calc position coef
-                if wa_ratio < user.deep_contango_coef:
-                    position_coef = user.deep_contango_setup_coef
-                elif wa_ratio < user.enter_coef:
-                    position_coef = user.setup_coef
+                if wa_ratio < 0.95:
+                    position_coef = 1/3
                 else:
                     position_coef = 0
 
@@ -191,18 +229,21 @@ class IBTradeEngine(object):
                     if user.trade_log_tbl.empty:  # it's first trading
                         log = 'Open'
                         capital = user.capital
-                        position = capital * position_coef / self.trade_market_px
+                        position = -capital * position_coef // self.trade_market_px
                         unrealized_pnl = 0
                         realized_pnl = 0
                         pnl = 0
-                        tvix_order = create_order('MKT', position, 'SELL')
-                        self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
-                        self.order_id += 1
+                        #TODO COMMENT OUT IB API
+                        # tvix_order = create_order('MKT', position, 'SELL')
+                        # self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
+                        # self.order_id += 1
                     else:
                         previous_signal = user.trade_log_tbl['signal'].iloc[t - 1]
-                        pre_trade_px = user.trade_log_tbl['market_px'].iloc[t - 1]
-                        pre_position = user.trade_log_tbl['position'].iloc[t - 1]
-                        previous_capital = user.trade_log_tbl['capital'].iloc[t - 1]
+                        if type(previous_signal) == str:
+                            previous_signal = True if previous_signal=='True' else False
+                        pre_trade_px = float(user.trade_log_tbl['market_px'].iloc[t - 1])
+                        pre_position = float(user.trade_log_tbl['position'].iloc[t - 1])
+                        previous_capital = float(user.trade_log_tbl['capital'].iloc[t - 1])
                         pnl = (self.trade_market_px - pre_trade_px) * pre_position  # Pnl always now - previous
                         if previous_signal: # Previous signal is Open
 
@@ -211,40 +252,41 @@ class IBTradeEngine(object):
                                 self.hold_flag = True
                                 self.hold_index = t
 
-                            # calculate the unrealized pnl
+                            # first time hold
                             if self.hold_index > 0:
                                 log = 'hold' # no action
-                                unrealized_pnl = user.trade_log_tbl['pnl'][self.hold_index:t + 1].sum()
+                                unrealized_pnl = user.trade_log_tbl['unrealized_pnl'][self.hold_index:t + 1].sum()+pnl
                                 realized_pnl = 0
+                                if unrealized_pnl > self.trade_market_px * self.buffer_size:
+                                    log = 'rebalance'
+                                    realized_pnl = unrealized_pnl
+                                    unrealized_pnl = 0
+                                    capital = previous_capital + realized_pnl
+                                    position = -capital * position_coef // self.trade_market_px
+                                    # TODO COMMENT OUT IB API
+                                    # self.rebalance_action(close_position=pre_position, open_position=position)
+                                    self.hold_index = 0
                             else:
                                 # SELL first then Buy
                                 log = 'rebalance'
                                 unrealized_pnl = 0
                                 realized_pnl = pnl
                                 capital = previous_capital + realized_pnl
-                                position = capital/ self.trade_market_px
-                                self.rebalance_action(close_position=pre_position, open_position=position)
+                                position = -capital * position_coef// self.trade_market_px
+                                # TODO COMMENT OUT IB API
+                                #self.rebalance_action(close_position=pre_position, open_position=position)
                                 self.hold_index = 0
 
-                            # Hold until realized_pnl >0
-                            if self.hold_flag and unrealized_pnl > self.trade_market_px * self.buffer_size:
-                                log = "Hold until unrealized_pnl > 0"
-                                realized_pnl = unrealized_pnl
-                                unrealized_pnl = 0
-                                capital = previous_capital + realized_pnl
-                                position = capital / self.trade_market_px
-                                self.rebalance_action(close_position=pre_position, open_position=position)
-                                self.hold_flag = False
-                                self.hold_index = 0
                         else: # Previous signal is Close, now signal is Open
                             log = 'Open'
-                            position = previous_capital * self.setup_coef / self.trade_market_px
+                            position = -previous_capital * position_coef // self.trade_market_px
                             unrealized_pnl = 0
                             realized_pnl = 0
                             pnl = 0
-                            tvix_order = create_order('MKT', position, 'SELL')
-                            self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
-                            self.order_id += 1
+                            # TODO COMMENT OUT IB API
+                            # tvix_order = create_order('MKT', position, 'SELL')
+                            # self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
+                            #self.order_id += 1
                             self.hold_flag = False
                             self.hold_index = 0
                 else: # now signal is close
@@ -257,20 +299,23 @@ class IBTradeEngine(object):
                         pnl = 0
                     else:
                         previous_signal = user.trade_log_tbl['signal'].iloc[t - 1]
+                        if type(previous_signal) == str:
+                            previous_signal = True if previous_signal=='True' else False
                         pre_trade_px = float(user.trade_log_tbl['market_px'].iloc[t - 1])
-                        pre_unrealized_pnl = user.trade_log_tbl['unrealized_pnl'].iloc[t - 1]
-                        pre_position = user.trade_log_tbl['position'].iloc[t - 1]
-                        previous_capital = user.trade_log_tbl['capital'].iloc[t - 1]
-                        pnl = (self.trade_market_px - pre_trade_px) * pre_position
+                        pre_unrealized_pnl = float(user.trade_log_tbl['unrealized_pnl'].iloc[t - 1])
+                        pre_position = float(user.trade_log_tbl['position'].iloc[t - 1])
+                        previous_capital = float(user.trade_log_tbl['capital'].iloc[t - 1])
+                        pnl = (self.trade_market_px - pre_trade_px) * float(pre_position)
                         if previous_signal: # if previous is open, now is close
                             log = 'Close'
                             position = 0
                             unrealized_pnl = 0
                             realized_pnl = pre_unrealized_pnl + pnl
                             capital = previous_capital+ realized_pnl
-                            tvix_order = create_order('MKT', pre_position, 'BUY')
-                            self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
-                            self.order_id += 1
+                            # TODO COMMENT OUT IB API
+                            # tvix_order = create_order('MKT', pre_position, 'BUY')
+                            # self.tws_conn.placeOrder(self.order_id, self.tvix_contract, tvix_order)
+                            # self.order_id += 1
                         else: # if previous is close, now is close
                             log = 'Close'
                             position = 0
@@ -292,6 +337,10 @@ class IBTradeEngine(object):
                                                          capital,
                                                          log])
                 t += 1
+                print(user.trade_log_tbl)
+                if trade_time.minute >30 and trade_time.minute<40:
+                    body = EmailNotification.covert_df_to_html(user.trade_log_tbl)
+                    EmailNotification.send_email(user.email, "Paper Trading Notification", body)
                 logger.info("Sleeping for {0} seconds...".format(self.intraday_window))
                 time.sleep(self.intraday_window)
 

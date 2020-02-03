@@ -42,10 +42,7 @@ class PandasUtils(object):
         :return: <DataFrame> The dataframe with the newly appended row
         """
 
-        numEl = len(ls)
-
-        newRow = pandas.DataFrame(numpy.array(ls).reshape(1, numEl), columns=list(df.columns))
-
-        df = df.append(newRow, ignore_index=True)
+        df_length = len(df)
+        df.loc[df_length] = ls
 
         return df

@@ -14,7 +14,7 @@ class EmailNotification(object):
                    subject,
                    body,
                    sender='short.vix.notification@gmail.com',
-                   pwd=''):
+                   pwd='ilove37%%%'):
         FROM = sender
         TO = recipient if isinstance(recipient, list) else [recipient]
 

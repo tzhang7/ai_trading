@@ -32,7 +32,7 @@ class User(object):
                                  'vix_spot': float,
                                  'wa_ratio': float,
                                  'market_px': float,
-                                 'signal': str,
+                                 'signal': bool,
                                  'position': float,
                                  'unrealized_pnl': float,
                                  'realized_pnl': float,
